@@ -143,39 +143,47 @@ export default function CollaborativeCanvas() {
   }
 
   function connectWs(currentRoom: string) {
-    const ws = new WebSocket("ws://localhost:8080");
+    // 1) 배포/로컬 공용: Vercel(Vite) 환경변수에서 WS 주소 가져오기
+    const WS_URL = import.meta.env.VITE_WS_URL;
+
+    // 배포에서 이 값이 없으면 조용히 localhost로 떨어지지 말고 즉시 실패하게
+    if (!WS_URL) {
+        throw new Error("VITE_WS_URL is not defined. Set it in Vercel env vars.");
+    }
+
+    const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      setConnected(true);
-      const join: JoinMsg = { type: "join", room: currentRoom, userId };
-      ws.send(JSON.stringify(join));
+        setConnected(true);
+        const join: JoinMsg = { type: "join", room: currentRoom, userId };
+        ws.send(JSON.stringify(join));
     };
 
     ws.onclose = () => {
-      setConnected(false);
+        setConnected(false);
     };
 
     ws.onmessage = (ev) => {
-      let msg: AnyMsg;
-      try {
+        let msg: AnyMsg;
+        try {
         msg = JSON.parse(ev.data);
-      } catch {
+        } catch {
         return;
-      }
-      const ctx = ctxRef.current;
-      if (!ctx) return;
+        }
 
-      if (msg.type === "history") {
-        // 히스토리 재생
+        const ctx = ctxRef.current;
+        if (!ctx) return;
+
+        if (msg.type === "history") {
         remoteStrokeRef.current.clear();
         for (const e of msg.events) handleRemoteEvent(e);
         return;
-      }
+        }
 
-      handleRemoteEvent(msg);
+        handleRemoteEvent(msg);
     };
-  }
+    }
 
   function handleRemoteEvent(msg: BeginMsg | MoveMsg | EndMsg | JoinMsg) {
     const ctx = ctxRef.current;
